@@ -3,9 +3,7 @@ package redis_test
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"path/filepath"
 	"time"
 
 	"github.com/pivotal-cf/cf-redis-broker/redis"
@@ -52,7 +50,6 @@ var _ = Describe("Redis Process Controller", func() {
 	var fakeProcessKiller *fakeProcessKiller = &fakeProcessKiller{}
 	var commandRunner *system.FakeCommandRunner
 	var connectionTimeoutErr error
-	var pidfilePath = "/dev/null"
 
 	BeforeEach(func() {
 		connectionTimeoutErr = nil
@@ -76,18 +73,18 @@ var _ = Describe("Redis Process Controller", func() {
 
 	itStartsARedisProcess := func(executablePath string) {
 		Ω(commandRunner.Commands).To(Equal([]string{
-			fmt.Sprintf("%s configFilePath --pidfile %s --dir instanceDataDir --logfile logFilePath", executablePath, pidfilePath),
+			fmt.Sprintf("%s configFilePath --pidfile pidFilePath --dir instanceDataDir --logfile logFilePath", executablePath),
 		}))
 	}
 
 	Describe("StartAndWaitUntilReady", func() {
 		It("runs the right command to start redis", func() {
-			processController.StartAndWaitUntilReady(instance, "configFilePath", "instanceDataDir", pidfilePath, "logFilePath", time.Second*1)
+			processController.StartAndWaitUntilReady(instance, "configFilePath", "instanceDataDir", "pidFilePath", "logFilePath", time.Second*1)
 			itStartsARedisProcess("redis-server")
 		})
 
 		It("returns no error", func() {
-			err := processController.StartAndWaitUntilReady(instance, "", "", pidfilePath, "", time.Second*1)
+			err := processController.StartAndWaitUntilReady(instance, "", "", "", "", time.Second*1)
 			Ω(err).NotTo(HaveOccurred())
 		})
 
@@ -97,7 +94,7 @@ var _ = Describe("Redis Process Controller", func() {
 			})
 
 			It("returns the same error that the WaitUntilConnectableFunc returns", func() {
-				err := processController.StartAndWaitUntilReady(instance, "", "", pidfilePath, "", time.Second*1)
+				err := processController.StartAndWaitUntilReady(instance, "", "", "", "", time.Second*1)
 				Ω(err).To(Equal(connectionTimeoutErr))
 			})
 		})
@@ -111,7 +108,7 @@ var _ = Describe("Redis Process Controller", func() {
 
 				args := []string{
 					"configFilePath",
-					"--pidfile", pidfilePath,
+					"--pidfile", "pidFilePath",
 					"--dir", "instanceDataDir",
 					"--logfile", "logFilePath",
 				}
@@ -123,7 +120,7 @@ var _ = Describe("Redis Process Controller", func() {
 		It("runs the right command to start redis", func() {
 			args := []string{
 				"configFilePath",
-				"--pidfile", pidfilePath,
+				"--pidfile", "pidFilePath",
 				"--dir", "instanceDataDir",
 				"--logfile", "logFilePath",
 			}
@@ -132,54 +129,8 @@ var _ = Describe("Redis Process Controller", func() {
 		})
 
 		It("returns no error", func() {
-			args := []string{
-				"--pidfile", pidfilePath,
-			}
-			err := processController.StartAndWaitUntilReadyWithConfig(instance, args, time.Second*1)
+			err := processController.StartAndWaitUntilReadyWithConfig(instance, []string{}, time.Second*1)
 			Ω(err).NotTo(HaveOccurred())
-		})
-
-		Context("when a PID file is successfully written", func() {
-			BeforeEach(func() {
-				tmpDir, err := ioutil.TempDir("", "redis_process_controller_test")
-				Ω(err).ToNot(HaveOccurred())
-
-				pidfilePath = filepath.Join(tmpDir, "redis.pid")
-				Ω(err).ToNot(HaveOccurred())
-
-				go func() {
-					defer GinkgoRecover()
-					time.Sleep(200 * time.Millisecond)
-					err := ioutil.WriteFile(pidfilePath, []byte{}, 0666)
-					Ω(err).ToNot(HaveOccurred())
-				}()
-			})
-
-			It("should succeed after waiting", func() {
-				args := []string{
-					"configFilePath",
-					"--pidfile", pidfilePath,
-					"--dir", "instanceDataDir",
-					"--logfile", "logFilePath",
-				}
-				err := processController.StartAndWaitUntilReadyWithConfig(instance, args, time.Second*1)
-				Ω(err).ToNot(HaveOccurred())
-			})
-		})
-
-		Context("when a PID file is never written", func() {
-			var pidFilePath = "/does/not/exist"
-
-			It("should timeout", func() {
-				args := []string{
-					"configFilePath",
-					"--pidfile", pidFilePath,
-					"--dir", "instanceDataDir",
-					"--logfile", "logFilePath",
-				}
-				err := processController.StartAndWaitUntilReadyWithConfig(instance, args, time.Second*1)
-				Ω(err).To(HaveOccurred())
-			})
 		})
 
 		Context("when the redis process fails to start", func() {
@@ -188,10 +139,7 @@ var _ = Describe("Redis Process Controller", func() {
 			})
 
 			It("returns the same error that the WaitUntilConnectableFunc returns", func() {
-				args := []string{
-					"--pidfile", pidfilePath,
-				}
-				err := processController.StartAndWaitUntilReadyWithConfig(instance, args, time.Second*1)
+				err := processController.StartAndWaitUntilReadyWithConfig(instance, []string{}, time.Second*1)
 				Ω(err).To(Equal(connectionTimeoutErr))
 			})
 		})
@@ -228,7 +176,7 @@ var _ = Describe("Redis Process Controller", func() {
 			})
 
 			It("starts it", func() {
-				err := processController.EnsureRunning(instance, "configFilePath", "instanceDataDir", pidfilePath, "logFilePath")
+				err := processController.EnsureRunning(instance, "configFilePath", "instanceDataDir", "pidFilePath", "logFilePath")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				itStartsARedisProcess("redis-server")

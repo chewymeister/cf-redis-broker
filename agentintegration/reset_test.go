@@ -57,11 +57,6 @@ var _ = Describe("DELETE /", func() {
 		conf, err := redisconf.Load(redisConfPath)
 		Ω(err).ShouldNot(HaveOccurred())
 
-		port, err := strconv.Atoi(conf.Get("port"))
-		Ω(err).ShouldNot(HaveOccurred())
-
-		Expect(helpers.ServiceAvailable(uint(port))).To(BeTrue())
-
 		redisConn = helpers.BuildRedisClientFromConf(conf)
 	})
 
@@ -152,6 +147,14 @@ func checkRedisStopAndStart(c chan<- bool) {
 	var err error
 	redisSession, err = gexec.Start(exec.Command("redis-server", redisConfPath), GinkgoWriter, GinkgoWriter)
 	Ω(err).ShouldNot(HaveOccurred())
+
+	conf, err := redisconf.Load(redisConfPath)
+	Ω(err).ShouldNot(HaveOccurred())
+
+	port, err := strconv.Atoi(conf.Get("port"))
+	Ω(err).ShouldNot(HaveOccurred())
+
+	Expect(helpers.ServiceAvailable(uint(port))).To(BeTrue())
 
 	c <- true
 }
